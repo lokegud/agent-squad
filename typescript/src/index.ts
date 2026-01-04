@@ -13,6 +13,10 @@ export { SupervisorAgent, SupervisorAgentOptions } from './agents/supervisorAgen
 export { AgentResponse } from './agents/agent';
 export { AgentCallbacks } from './agents/agent';
 
+// Security Audit Agent
+export { SecurityAuditAgent, SecurityAuditAgentOptions } from './agents/security-audit';
+export * as SecurityAudit from './agents/security-audit';
+
 export { BedrockClassifier, BedrockClassifierOptions } from './classifiers/bedrockClassifier';
 export { AnthropicClassifier, AnthropicClassifierOptions } from './classifiers/anthropicClassifier';
 export { OpenAIClassifier, OpenAIClassifierOptions } from "./classifiers/openAIClassifier"
