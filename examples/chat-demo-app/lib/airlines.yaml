@@ -45,8 +45,6 @@ Mappings:
       Name: 'lex-usecases-ap-northeast-2'
     ap-northeast-1:
       Name: 'lex-usecases-ap-northeast-1'
-    af-south-1:
-      Name: 'lex-usecases-af-south-1'
   S3Path:
     LexImportSource:
       Name: 'travel/airlines/lex_import.zip'
@@ -63,7 +61,7 @@ Parameters:
       ARN of Connect Instance. To find your instance ARN:
       'https://docs.aws.amazon.com/connect/latest/adminguide/find-instance-arn.html'
     Default: ''
-    
+
   ContactFlowName:
     Type: String
     Description: >
