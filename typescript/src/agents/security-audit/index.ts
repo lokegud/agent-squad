@@ -17,13 +17,30 @@ export { NetworkMapper } from './scanners/networkMapper';
 export { ContainerScanner } from './scanners/containerScanner';
 export { AuthScanner } from './scanners/authScanner';
 export { LogAnalyzer } from './scanners/logAnalyzer';
+export { ClamAVScanner, ClamAVConfig, ClamAVScanResult, MalwareFinding } from './scanners/clamavScanner';
 
 // Analyzer exports
 export { HybridAIProcessor } from './analyzers/hybridAIProcessor';
 export { ContinuousMonitor } from './analyzers/continuousMonitor';
 
+// Integration exports
+export { MatrixClient, MatrixConfig, MatrixMessage, MatrixRoom } from './integrations/matrixClient';
+
 // Utility exports
 export { DataSanitizer } from './utils/sanitizer';
+export {
+  CommandSafetyWrapper,
+  CommandSafetyConfig,
+  CommandRiskAssessment,
+  CodeLinter,
+  LintConfig,
+  LintResult,
+  LintIssue,
+  MCPMemory,
+  MCPConfig,
+  MemoryEntry
+} from './utils/safetyWrappers';
+export { IdentityGenerator, GeneratedIdentity, GeneratorOptions } from './utils/identityGenerator';
 
 // Default export
 export { SecurityAuditAgent as default } from './securityAuditAgent';
