@@ -30,6 +30,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.51.0",
+    "better-sqlite3": "^11.0.0",
+    "js-yaml": "^4.1.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.701.0",
     "@aws-sdk/client-bedrock-runtime": "^3.812.0",
     "@aws-sdk/client-comprehend": "^3.637.0",
@@ -47,7 +49,9 @@
     "stopword": "^3.0.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
     "@types/jest": "^29.5.12",
+    "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.7",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
     "@typescript-eslint/parser": "^7.17.0",

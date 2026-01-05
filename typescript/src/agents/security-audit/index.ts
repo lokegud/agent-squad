@@ -64,5 +64,45 @@ export {
 } from './utils/safetyWrappers';
 export { IdentityGenerator, GeneratedIdentity, GeneratorOptions } from './utils/identityGenerator';
 
+// Config exports
+export {
+  ConfigLoader,
+  ConfigLoaderOptions,
+  LoadedConfig,
+  loadConfig,
+  generateSampleConfig
+} from './config/configLoader';
+
+// Report exports
+export {
+  ReportExporter,
+  ReportOptions,
+  GeneratedReport,
+  exportReport
+} from './reports/reportExporter';
+
+// Storage exports
+export {
+  SQLiteDatabase,
+  IDatabase,
+  StorageConfig,
+  StoredAudit,
+  StoredFinding,
+  StoredAlert,
+  TrendData,
+  QueryOptions,
+  createDatabase
+} from './storage/database';
+
+// API exports
+export {
+  APIServer,
+  APIServerConfig,
+  APIRequest,
+  APIResponse,
+  WebhookConfig,
+  createAPIServer
+} from './api/server';
+
 // Default export
 export { SecurityAuditAgent as default } from './securityAuditAgent';
