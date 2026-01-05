@@ -18,6 +18,13 @@ export { ContainerScanner } from './scanners/containerScanner';
 export { AuthScanner } from './scanners/authScanner';
 export { LogAnalyzer } from './scanners/logAnalyzer';
 export { ClamAVScanner, ClamAVConfig, ClamAVScanResult, MalwareFinding, MalwareResearchResult, MalwareOrigin, EmailConfig, MalwareResearchConfig } from './scanners/clamavScanner';
+export {
+  NetworkTrafficMonitor,
+  NetworkMonitorConfig,
+  NetworkConnection,
+  PhoneHomeAlert,
+  DnsQuery
+} from './scanners/networkTrafficMonitor';
 
 // Analyzer exports
 export { HybridAIProcessor } from './analyzers/hybridAIProcessor';
