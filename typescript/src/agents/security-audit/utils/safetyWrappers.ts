@@ -21,16 +21,14 @@ const execAsync = promisify(exec);
 // ============================================================================
 
 export interface CommandSafetyConfig {
-  /** Require verification for destructive commands */
+  /** Require verification for dangerous commands */
   requireVerification: boolean;
   /** Verification timeout (ms) */
   verificationTimeout: number;
-  /** Blocked command patterns */
-  blockedPatterns: RegExp[];
+  /** Commands requiring explicit verification (dangerous operations) */
+  dangerousPatterns: RegExp[];
   /** Allowed command patterns (if set, only these are allowed) */
   allowedPatterns?: RegExp[];
-  /** Commands requiring explicit verification */
-  verifyPatterns: RegExp[];
   /** Dry run mode - don't execute, just validate */
   dryRun: boolean;
   /** Log all commands */
@@ -43,76 +41,71 @@ export interface CommandSafetyConfig {
 
 export interface CommandRiskAssessment {
   command: string;
-  risk: 'safe' | 'caution' | 'dangerous' | 'blocked';
+  risk: 'safe' | 'dangerous';
   reasons: string[];
   requiresVerification: boolean;
   alternatives?: string[];
 }
 
-// Destructive command patterns
-const DESTRUCTIVE_PATTERNS = [
+// All dangerous command patterns - these require verification before execution
+const DANGEROUS_PATTERNS = [
   // File system destruction
   /\brm\s+(-rf?|--recursive|--force)\s+[\/~]/i,
   /\brm\s+-rf?\s+\*/i,
+  /\brm\s+/i,
   /\brmdir\s+/i,
   /\bmkfs\b/i,
   /\bdd\s+.*of=/i,
   /\bshred\b/i,
   />\s*\/dev\/sd[a-z]/i,
 
-  // System destruction
+  // System operations
   /:(){ :|:& };:/,  // Fork bomb
-  /\bsystemctl\s+(stop|disable|mask)\s+(network|ssh|docker)/i,
+  /\bsystemctl\s+(stop|disable|mask|restart|reload)\s+/i,
   /\bkillall\b/i,
   /\bpkill\s+-9/i,
+  /\bsudo\s+/i,
 
   // Permission/security changes
   /\bchmod\s+(-R\s+)?777/i,
   /\bchmod\s+(-R\s+)?666/i,
-  /\bchown\s+-R\s+.*\s+\//i,
-  /\bpasswd\s+root/i,
-  /\busermod\s+.*-aG\s+sudo/i,
-
-  // Database destruction
-  /\bDROP\s+(DATABASE|TABLE|SCHEMA)/i,
-  /\bTRUNCATE\s+TABLE/i,
-  /\bDELETE\s+FROM\s+\w+\s*;?\s*$/i,  // DELETE without WHERE
-
-  // Container destruction
-  /\bdocker\s+(rm|rmi|system\s+prune)\s+-f/i,
-  /\bdocker\s+stop\s+\$\(docker\s+ps/i,
-  /\bkubectl\s+delete\s+(namespace|ns)\s+/i,
-
-  // Git destruction
-  /\bgit\s+push\s+.*--force/i,
-  /\bgit\s+reset\s+--hard/i,
-  /\bgit\s+clean\s+-fd/i,
-
-  // Network disruption
-  /\biptables\s+-F/i,
-  /\biptables\s+.*DROP/i,
-  /\bifconfig\s+\w+\s+down/i,
-
-  // Encryption/ransom risk
-  /\bopenssl\s+enc\s+.*-e/i,
-  /\bgpg\s+.*--encrypt/i,
-];
-
-// Commands requiring verification (but not blocked)
-const VERIFY_PATTERNS = [
-  /\brm\s+/i,
-  /\bsudo\s+/i,
   /\bchmod\s+/i,
   /\bchown\s+/i,
-  /\bsystemctl\s+(restart|reload)/i,
-  /\bdocker\s+(stop|rm|rmi)/i,
-  /\bkubectl\s+delete/i,
-  /\bgit\s+(push|reset|rebase)/i,
-  /\bDROP\s+/i,
-  /\bDELETE\s+/i,
+  /\bpasswd\s+/i,
+  /\busermod\s+/i,
+
+  // Database operations
+  /\bDROP\s+(DATABASE|TABLE|SCHEMA)/i,
+  /\bTRUNCATE\s+TABLE/i,
+  /\bDELETE\s+FROM/i,
   /\bUPDATE\s+.*SET/i,
+
+  // Container operations
+  /\bdocker\s+(rm|rmi|stop|system\s+prune)/i,
+  /\bdocker\s+stop\s+\$\(docker\s+ps/i,
+  /\bkubectl\s+delete/i,
+
+  // Git operations
+  /\bgit\s+push\s+.*--force/i,
+  /\bgit\s+push/i,
+  /\bgit\s+reset\s+--hard/i,
+  /\bgit\s+reset/i,
+  /\bgit\s+rebase/i,
+  /\bgit\s+clean\s+-fd/i,
+
+  // Network operations
+  /\biptables\s+/i,
+  /\bifconfig\s+\w+\s+down/i,
+
+  // Encryption operations
+  /\bopenssl\s+enc\s+.*-e/i,
+  /\bgpg\s+.*--encrypt/i,
+
+  // Package management
   /\bnpm\s+(publish|unpublish)/i,
   /\bpip\s+uninstall/i,
+  /\bapt\s+(remove|purge)/i,
+  /\byum\s+(remove|erase)/i,
 ];
 
 export class CommandSafetyWrapper extends EventEmitter {
@@ -133,9 +126,8 @@ export class CommandSafetyWrapper extends EventEmitter {
     this.config = {
       requireVerification: config?.requireVerification ?? true,
       verificationTimeout: config?.verificationTimeout ?? 60000,
-      blockedPatterns: config?.blockedPatterns ?? DESTRUCTIVE_PATTERNS,
+      dangerousPatterns: config?.dangerousPatterns ?? DANGEROUS_PATTERNS,
       allowedPatterns: config?.allowedPatterns,
-      verifyPatterns: config?.verifyPatterns ?? VERIFY_PATTERNS,
       dryRun: config?.dryRun ?? false,
       auditLog: config?.auditLog ?? true,
       auditLogPath: config?.auditLogPath ?? '/var/log/security-audit/commands.log',
@@ -145,7 +137,7 @@ export class CommandSafetyWrapper extends EventEmitter {
     this.logger.info('command', 'initialized', 'Command safety wrapper initialized', {
       requireVerification: this.config.requireVerification,
       dryRun: this.config.dryRun,
-      blockedPatternCount: this.config.blockedPatterns.length
+      dangerousPatternCount: this.config.dangerousPatterns.length
     });
   }
 
@@ -158,31 +150,23 @@ export class CommandSafetyWrapper extends EventEmitter {
     let requiresVerification = false;
     const alternatives: string[] = [];
 
-    // Check blocked patterns
-    for (const pattern of this.config.blockedPatterns) {
-      if (pattern.test(command)) {
-        risk = 'blocked';
-        reasons.push(`Matches blocked pattern: ${pattern.source}`);
-      }
-    }
-
-    // Check if only allowed patterns
-    if (this.config.allowedPatterns && risk !== 'blocked') {
+    // Check if only allowed patterns (whitelist mode)
+    if (this.config.allowedPatterns) {
       const isAllowed = this.config.allowedPatterns.some(p => p.test(command));
       if (!isAllowed) {
-        risk = 'blocked';
+        risk = 'dangerous';
+        requiresVerification = true;
         reasons.push('Command not in allowed list');
       }
     }
 
-    // Check verification patterns
-    if (risk !== 'blocked') {
-      for (const pattern of this.config.verifyPatterns) {
-        if (pattern.test(command)) {
-          risk = risk === 'safe' ? 'caution' : risk;
-          requiresVerification = true;
-          reasons.push(`Requires verification: ${pattern.source}`);
-        }
+    // Check dangerous patterns - all require verification
+    for (const pattern of this.config.dangerousPatterns) {
+      if (pattern.test(command)) {
+        risk = 'dangerous';
+        requiresVerification = true;
+        reasons.push(`Dangerous operation: ${pattern.source}`);
+        break;  // One match is enough
       }
     }
 
@@ -195,6 +179,15 @@ export class CommandSafetyWrapper extends EventEmitter {
     }
     if (command.includes('--force')) {
       alternatives.push('Remove --force flag and review changes first');
+    }
+    if (command.includes('git push')) {
+      alternatives.push('Consider using git push --dry-run first');
+    }
+    if (command.includes('DROP')) {
+      alternatives.push('Create a backup before dropping');
+    }
+    if (command.includes('DELETE FROM') && !command.toLowerCase().includes('where')) {
+      alternatives.push('Add a WHERE clause to limit deletion scope');
     }
 
     return {
@@ -224,48 +217,36 @@ export class CommandSafetyWrapper extends EventEmitter {
 
     await this.logCommand(command, assessment);
 
-    // Block dangerous commands
-    if (assessment.risk === 'blocked') {
-      this.logger.warning('command', 'blocked', `Blocked dangerous command: ${command.slice(0, 100)}`, {
-        command: command.slice(0, 200),
-        reasons: assessment.reasons,
-        alternatives: assessment.alternatives
-      });
-
-      this.emit('blocked', { command, assessment });
-      this.bus.endCorrelation();
-
-      return {
-        stdout: '',
-        stderr: `Command blocked: ${assessment.reasons.join(', ')}`,
-        blocked: true
-      };
-    }
-
-    // Request verification if needed
+    // Request verification for dangerous commands
     if (assessment.requiresVerification) {
-      this.logger.notice('command', 'verification_required', `Command requires verification: ${command.slice(0, 100)}`, {
-        command: command.slice(0, 200),
-        reasons: assessment.reasons
-      });
+      this.logger.notice('command', 'verification_required',
+        `⚠️ Dangerous command requires verification: ${command.slice(0, 100)}`, {
+          command: command.slice(0, 200),
+          reasons: assessment.reasons,
+          alternatives: assessment.alternatives
+        });
+
+      this.emit('verification_required', { command, assessment });
 
       const approved = await this.requestVerification(command, assessment);
       if (!approved) {
-        this.logger.warning('command', 'verification_denied', `User denied command execution: ${command.slice(0, 100)}`, {
-          command: command.slice(0, 200)
-        });
+        this.logger.warning('command', 'verification_denied',
+          `User denied command execution: ${command.slice(0, 100)}`, {
+            command: command.slice(0, 200)
+          });
 
         this.bus.endCorrelation();
         return {
           stdout: '',
-          stderr: 'Command not approved by user',
+          stderr: `Command requires verification: ${assessment.reasons.join(', ')}\nAlternatives: ${assessment.alternatives?.join(', ') || 'none'}`,
           blocked: true
         };
       }
 
-      this.logger.info('command', 'verification_approved', `User approved command: ${command.slice(0, 100)}`, {
-        command: command.slice(0, 200)
-      });
+      this.logger.info('command', 'verification_approved',
+        `User approved dangerous command: ${command.slice(0, 100)}`, {
+          command: command.slice(0, 200)
+        });
     }
 
     // Dry run mode
