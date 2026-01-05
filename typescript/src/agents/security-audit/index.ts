@@ -17,7 +17,7 @@ export { NetworkMapper } from './scanners/networkMapper';
 export { ContainerScanner } from './scanners/containerScanner';
 export { AuthScanner } from './scanners/authScanner';
 export { LogAnalyzer } from './scanners/logAnalyzer';
-export { ClamAVScanner, ClamAVConfig, ClamAVScanResult, MalwareFinding } from './scanners/clamavScanner';
+export { ClamAVScanner, ClamAVConfig, ClamAVScanResult, MalwareFinding, MalwareResearchResult, MalwareOrigin, EmailConfig, MalwareResearchConfig } from './scanners/clamavScanner';
 
 // Analyzer exports
 export { HybridAIProcessor } from './analyzers/hybridAIProcessor';
