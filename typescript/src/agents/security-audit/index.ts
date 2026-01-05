@@ -25,6 +25,21 @@ export { ContinuousMonitor } from './analyzers/continuousMonitor';
 
 // Integration exports
 export { MatrixClient, MatrixConfig, MatrixMessage, MatrixRoom } from './integrations/matrixClient';
+export { MatrixLogger, MatrixLoggerConfig, createMatrixLogger } from './integrations/matrixLogger';
+
+// Event system exports
+export {
+  AgentEventBus,
+  SourceLogger,
+  AgentEvent,
+  EventSeverity,
+  EventCategory,
+  EventFilter,
+  EventSubscriber,
+  StreamOptions,
+  eventBus,
+  attachConsoleLogger
+} from './utils/eventBus';
 
 // Utility exports
 export { DataSanitizer } from './utils/sanitizer';

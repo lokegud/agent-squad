@@ -2,6 +2,9 @@
  * Safety Wrappers
  * Prevents destructive commands, validates code with linting/LSP,
  * and provides MCP integration for memory and documentation
+ *
+ * All wrappers emit events through the central event bus for
+ * logging, monitoring, and Matrix notifications.
  */
 
 import { exec, spawn } from 'child_process';
@@ -9,6 +12,7 @@ import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EventEmitter } from 'events';
+import { AgentEventBus, eventBus, SourceLogger } from './eventBus';
 
 const execAsync = promisify(exec);
 
@@ -117,9 +121,14 @@ export class CommandSafetyWrapper extends EventEmitter {
     resolve: (approved: boolean) => void;
     timeout: NodeJS.Timeout;
   }> = new Map();
+  private logger: SourceLogger;
+  private bus: AgentEventBus;
 
-  constructor(config?: Partial<CommandSafetyConfig>) {
+  constructor(config?: Partial<CommandSafetyConfig>, bus?: AgentEventBus) {
     super();
+
+    this.bus = bus || eventBus;
+    this.logger = this.bus.createLogger('CommandSafetyWrapper');
 
     this.config = {
       requireVerification: config?.requireVerification ?? true,
@@ -132,6 +141,12 @@ export class CommandSafetyWrapper extends EventEmitter {
       auditLogPath: config?.auditLogPath ?? '/var/log/security-audit/commands.log',
       verificationCallback: config?.verificationCallback
     };
+
+    this.logger.info('command', 'initialized', 'Command safety wrapper initialized', {
+      requireVerification: this.config.requireVerification,
+      dryRun: this.config.dryRun,
+      blockedPatternCount: this.config.blockedPatterns.length
+    });
   }
 
   /**
@@ -198,14 +213,28 @@ export class CommandSafetyWrapper extends EventEmitter {
     command: string,
     options?: { cwd?: string; timeout?: number }
   ): Promise<{ stdout: string; stderr: string; blocked: boolean }> {
+    const correlationId = this.bus.startCorrelation('command');
     const assessment = this.assessRisk(command);
 
     // Log the attempt
+    this.logger.debug('command', 'assess', `Assessing command: ${command.slice(0, 50)}...`, {
+      risk: assessment.risk,
+      requiresVerification: assessment.requiresVerification
+    });
+
     await this.logCommand(command, assessment);
 
     // Block dangerous commands
     if (assessment.risk === 'blocked') {
+      this.logger.warning('command', 'blocked', `Blocked dangerous command: ${command.slice(0, 100)}`, {
+        command: command.slice(0, 200),
+        reasons: assessment.reasons,
+        alternatives: assessment.alternatives
+      });
+
       this.emit('blocked', { command, assessment });
+      this.bus.endCorrelation();
+
       return {
         stdout: '',
         stderr: `Command blocked: ${assessment.reasons.join(', ')}`,
@@ -215,18 +244,37 @@ export class CommandSafetyWrapper extends EventEmitter {
 
     // Request verification if needed
     if (assessment.requiresVerification) {
+      this.logger.notice('command', 'verification_required', `Command requires verification: ${command.slice(0, 100)}`, {
+        command: command.slice(0, 200),
+        reasons: assessment.reasons
+      });
+
       const approved = await this.requestVerification(command, assessment);
       if (!approved) {
+        this.logger.warning('command', 'verification_denied', `User denied command execution: ${command.slice(0, 100)}`, {
+          command: command.slice(0, 200)
+        });
+
+        this.bus.endCorrelation();
         return {
           stdout: '',
           stderr: 'Command not approved by user',
           blocked: true
         };
       }
+
+      this.logger.info('command', 'verification_approved', `User approved command: ${command.slice(0, 100)}`, {
+        command: command.slice(0, 200)
+      });
     }
 
     // Dry run mode
     if (this.config.dryRun) {
+      this.logger.info('command', 'dry_run', `Dry run: ${command.slice(0, 100)}`, {
+        command: command.slice(0, 200)
+      });
+
+      this.bus.endCorrelation();
       return {
         stdout: `[DRY RUN] Would execute: ${command}`,
         stderr: '',
@@ -236,16 +284,36 @@ export class CommandSafetyWrapper extends EventEmitter {
 
     // Execute the command
     try {
+      this.logger.debug('command', 'executing', `Executing: ${command.slice(0, 100)}`, {
+        cwd: options?.cwd,
+        timeout: options?.timeout
+      });
+
       const { stdout, stderr } = await execAsync(command, {
         cwd: options?.cwd,
         timeout: options?.timeout ?? 60000,
         maxBuffer: 10 * 1024 * 1024
       });
 
+      this.logger.info('command', 'executed', `Command completed: ${command.slice(0, 100)}`, {
+        stdoutLength: stdout.length,
+        stderrLength: stderr.length,
+        hasStderr: stderr.length > 0
+      });
+
       this.emit('executed', { command, stdout, stderr });
+      this.bus.endCorrelation();
       return { stdout, stderr, blocked: false };
     } catch (error) {
       const execError = error as { stdout?: string; stderr?: string; message?: string };
+
+      this.logger.error('command', 'execution_failed', `Command failed: ${command.slice(0, 100)}`, {
+        command: command.slice(0, 200),
+        stdout: execError.stdout?.slice(0, 500),
+        stderr: execError.stderr?.slice(0, 500)
+      }, error instanceof Error ? error : String(error));
+
+      this.bus.endCorrelation();
       return {
         stdout: execError.stdout || '',
         stderr: execError.stderr || execError.message || String(error),
@@ -370,10 +438,17 @@ export interface LintIssue {
   fix?: string;
 }
 
-export class CodeLinter {
+export class CodeLinter extends EventEmitter {
   private config: LintConfig;
+  private logger: SourceLogger;
+  private bus: AgentEventBus;
 
-  constructor(config?: Partial<LintConfig>) {
+  constructor(config?: Partial<LintConfig>, bus?: AgentEventBus) {
+    super();
+
+    this.bus = bus || eventBus;
+    this.logger = this.bus.createLogger('CodeLinter');
+
     this.config = {
       typescript: config?.typescript ?? true,
       eslint: config?.eslint ?? true,
@@ -384,6 +459,13 @@ export class CodeLinter {
       failOnWarnings: config?.failOnWarnings ?? false,
       autoFix: config?.autoFix ?? false
     };
+
+    this.logger.info('lint', 'initialized', 'Code linter initialized', {
+      typescript: this.config.typescript,
+      eslint: this.config.eslint,
+      python: this.config.python,
+      shellcheck: this.config.shellcheck
+    });
   }
 
   /**
@@ -391,27 +473,67 @@ export class CodeLinter {
    */
   async lint(code: string, language?: string): Promise<LintResult> {
     const detectedLanguage = language || this.detectLanguage(code);
+    const correlationId = this.bus.startCorrelation('lint');
+
+    this.logger.debug('lint', 'start', `Linting ${detectedLanguage} code (${code.length} chars)`, {
+      language: detectedLanguage,
+      codeLength: code.length
+    });
+
+    let result: LintResult;
 
     switch (detectedLanguage) {
       case 'typescript':
       case 'javascript':
-        return this.lintJavaScript(code, detectedLanguage === 'typescript');
+        result = await this.lintJavaScript(code, detectedLanguage === 'typescript');
+        break;
 
       case 'python':
-        return this.lintPython(code);
+        result = await this.lintPython(code);
+        break;
 
       case 'shell':
       case 'bash':
-        return this.lintShell(code);
+        result = await this.lintShell(code);
+        break;
 
       default:
-        return {
+        result = {
           valid: true,
           language: detectedLanguage,
           errors: [],
           warnings: []
         };
     }
+
+    // Log result
+    if (result.errors.length > 0) {
+      this.logger.warning('lint', 'errors_found', `Found ${result.errors.length} errors in ${detectedLanguage} code`, {
+        language: detectedLanguage,
+        errorCount: result.errors.length,
+        warningCount: result.warnings.length,
+        errors: result.errors.slice(0, 5)  // First 5 errors
+      });
+
+      this.emit('errors', { result });
+    } else if (result.warnings.length > 0) {
+      this.logger.notice('lint', 'warnings_found', `Found ${result.warnings.length} warnings in ${detectedLanguage} code`, {
+        language: detectedLanguage,
+        warningCount: result.warnings.length,
+        warnings: result.warnings.slice(0, 5)
+      });
+
+      this.emit('warnings', { result });
+    } else {
+      this.logger.info('lint', 'passed', `Code passed linting (${detectedLanguage})`, {
+        language: detectedLanguage
+      });
+
+      this.emit('passed', { result });
+    }
+
+    this.bus.endCorrelation();
+    return result;
   }
 
   /**
@@ -693,11 +815,18 @@ export interface MemoryEntry {
   expiresAt?: Date;
 }
 
-export class MCPMemory {
+export class MCPMemory extends EventEmitter {
   private config: MCPConfig;
   private localCache: Map<string, MemoryEntry> = new Map();
+  private logger: SourceLogger;
+  private bus: AgentEventBus;
 
-  constructor(config: Partial<MCPConfig>) {
+  constructor(config: Partial<MCPConfig>, bus?: AgentEventBus) {
+    super();
+
+    this.bus = bus || eventBus;
+    this.logger = this.bus.createLogger('MCPMemory');
+
     this.config = {
       endpoint: config.endpoint || 'http://localhost:3000/mcp',
       apiKey: config.apiKey,
@@ -706,6 +835,13 @@ export class MCPMemory {
       maxEntries: config.maxEntries ?? 1000,
       ttlSeconds: config.ttlSeconds ?? 86400 // 24 hours
     };
+
+    this.logger.info('memory', 'initialized', 'MCP memory initialized', {
+      endpoint: this.config.endpoint,
+      namespace: this.config.namespace,
+      maxEntries: this.config.maxEntries,
+      ttlSeconds: this.config.ttlSeconds
+    });
   }
 
   /**
@@ -729,8 +865,20 @@ export class MCPMemory {
     // Store locally
     this.localCache.set(key, entry);
 
+    this.logger.debug('memory', 'stored', `Stored memory: ${key}`, {
+      key,
+      hasMetadata: !!metadata,
+      cacheSize: this.localCache.size
+    });
+
+    this.emit('stored', { key, entry });
+
     // Prune if needed
     if (this.localCache.size > this.config.maxEntries) {
+      this.logger.notice('memory', 'pruning', `Cache full, pruning oldest entries`, {
+        currentSize: this.localCache.size,
+        maxEntries: this.config.maxEntries
+      });
       this.pruneOldest();
     }
 
@@ -750,16 +898,28 @@ export class MCPMemory {
     const local = this.localCache.get(key);
     if (local) {
       if (!local.expiresAt || local.expiresAt > new Date()) {
+        this.logger.debug('memory', 'recall_hit', `Memory cache hit: ${key}`, { key });
+        this.emit('recall', { key, found: true, source: 'cache' });
         return local.value;
       }
+      this.logger.debug('memory', 'recall_expired', `Memory expired: ${key}`, { key });
       this.localCache.delete(key);
     }
 
     // Try remote
     if (this.config.endpoint) {
-      return this.fetchFromServer(key);
+      const value = await this.fetchFromServer(key);
+      if (value !== undefined) {
+        this.logger.debug('memory', 'recall_remote', `Memory fetched from server: ${key}`, { key });
+        this.emit('recall', { key, found: true, source: 'remote' });
+      } else {
+        this.logger.debug('memory', 'recall_miss', `Memory not found: ${key}`, { key });
+        this.emit('recall', { key, found: false });
+      }
+      return value;
     }
 
+    this.emit('recall', { key, found: false });
     return undefined;
   }
 
@@ -897,10 +1057,22 @@ export class MCPMemory {
       });
 
       if (!response.ok) {
-        console.warn('MCP sync failed:', response.status);
+        this.logger.warning('memory', 'sync_failed', `MCP sync failed for key: ${entry.key}`, {
+          key: entry.key,
+          status: response.status,
+          statusText: response.statusText
+        });
+        this.emit('sync_failed', { key: entry.key, status: response.status });
+      } else {
+        this.logger.debug('memory', 'synced', `Synced to MCP server: ${entry.key}`, { key: entry.key });
+        this.emit('synced', { key: entry.key });
       }
-    } catch {
-      // Server not available, use local only
+    } catch (error) {
+      this.logger.warning('memory', 'sync_error', `MCP server unavailable for key: ${entry.key}`, {
+        key: entry.key,
+        endpoint: this.config.endpoint
+      }, error instanceof Error ? error : String(error));
+      this.emit('sync_error', { key: entry.key, error });
     }
   }
 
@@ -920,10 +1092,19 @@ export class MCPMemory {
 
       if (response.ok) {
         const data = await response.json();
+        this.logger.debug('memory', 'fetch_success', `Fetched from server: ${key}`, { key });
         return data.value;
       }
-    } catch {
-      // Server not available
+
+      this.logger.debug('memory', 'fetch_not_found', `Key not found on server: ${key}`, {
+        key,
+        status: response.status
+      });
+    } catch (error) {
+      this.logger.warning('memory', 'fetch_error', `Failed to fetch from server: ${key}`, {
+        key,
+        endpoint: this.config.endpoint
+      }, error instanceof Error ? error : String(error));
     }
 
     return undefined;
@@ -934,7 +1115,7 @@ export class MCPMemory {
    */
   private async deleteFromServer(key: string): Promise<void> {
     try {
-      await fetch(
+      const response = await fetch(
         `${this.config.endpoint}/memory/${this.config.namespace}/${encodeURIComponent(key)}`,
         {
           method: 'DELETE',
@@ -943,8 +1124,20 @@ export class MCPMemory {
           }
         }
       );
-    } catch {
-      // Server not available
+
+      if (response.ok) {
+        this.logger.debug('memory', 'delete_success', `Deleted from server: ${key}`, { key });
+        this.emit('deleted', { key, source: 'remote' });
+      } else {
+        this.logger.warning('memory', 'delete_failed', `Failed to delete from server: ${key}`, {
+          key,
+          status: response.status
+        });
+      }
+    } catch (error) {
+      this.logger.warning('memory', 'delete_error', `Error deleting from server: ${key}`, {
+        key
+      }, error instanceof Error ? error : String(error));
     }
   }
 }
