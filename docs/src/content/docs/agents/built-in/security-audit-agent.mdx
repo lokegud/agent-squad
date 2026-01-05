@@ -1,0 +1,713 @@
+---
+title: Security Audit Agent
+description: Documentation for the SecurityAuditAgent in the Agent Squad System
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `SecurityAuditAgent` is a comprehensive AI-powered security auditing agent that performs infrastructure security assessments. It combines multiple specialized scanners with a hybrid AI approach that keeps sensitive data local while leveraging cloud AI for pattern analysis.
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Config Audit** | Scans for default credentials, exposed ports, weak authentication |
+| **Network Mapping** | Documents network topology, identifies unnecessary exposure |
+| **Container Security** | Checks Docker configs, privileged containers, volume mounts |
+| **Auth Review** | Analyzes shared credentials vs proper isolation |
+| **Log Analysis** | Pattern detection for brute force, data exfil, IMSI concerns |
+| **Hybrid AI** | Local model for scanning, Vertex AI for pattern analysis |
+| **Privacy-First** | Sensitive data stays local; only sanitized patterns sent to cloud |
+| **Continuous Monitoring** | Real-time change validation and dependency tracking |
+
+## Architecture
+
+The SecurityAuditAgent uses a modular architecture with specialized components:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  SecurityAuditAgent                         │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │                   Orchestrator                         │ │
+│  └───────────────────────────────────────────────────────┘ │
+│           │                   │                   │        │
+│  ┌────────▼────────┐ ┌───────▼───────┐ ┌────────▼───────┐ │
+│  │    Scanners     │ │   Analyzers   │ │    Monitors    │ │
+│  │  ─────────────  │ │  ───────────  │ │  ────────────  │ │
+│  │  ConfigScanner  │ │  HybridAI     │ │  Continuous    │ │
+│  │  NetworkMapper  │ │  Processor    │ │  Monitor       │ │
+│  │  ContainerScan  │ │               │ │                │ │
+│  │  AuthScanner    │ │  ┌─────────┐  │ │  ┌──────────┐  │ │
+│  │  LogAnalyzer    │ │  │ Local   │  │ │  │ Change   │  │ │
+│  └─────────────────┘ │  │ Model   │  │ │  │ Validator│  │ │
+│                      │  └────┬────┘  │ │  └──────────┘  │ │
+│  ┌─────────────────┐ │       │       │ │                │ │
+│  │   Utilities     │ │  ┌────▼────┐  │ │  ┌──────────┐  │ │
+│  │  ─────────────  │ │  │Sanitizer│  │ │  │Dependency│  │ │
+│  │  DataSanitizer  │ │  └────┬────┘  │ │  │ Tracker  │  │ │
+│  └─────────────────┘ │       │       │ │  └──────────┘  │ │
+│                      │  ┌────▼────┐  │ │                │ │
+│                      │  │Vertex AI│  │ │                │ │
+│                      │  └─────────┘  │ │                │ │
+│                      └───────────────┘ └────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { SecurityAuditAgent } from 'agent-squad';
+
+    // Create the agent
+    const agent = new SecurityAuditAgent({
+      name: 'MySecurityAgent',
+      description: 'Security auditor for my infrastructure'
+    });
+
+    // Run a full security audit
+    const response = await agent.processRequest(
+      'full audit',
+      'user-id',
+      'session-id',
+      []
+    );
+
+    console.log(response.content[0].text);
+    ```
+  </TabItem>
+</Tabs>
+
+## Configuration
+
+### Full Configuration Example
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { SecurityAuditAgent } from 'agent-squad';
+
+    const agent = new SecurityAuditAgent({
+      name: 'ProductionSecurityAgent',
+      description: 'Security auditor for production infrastructure',
+
+      config: {
+        // AI Model Configuration
+        modelConfig: {
+          modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+          temperature: 0,        // Deterministic for security
+          maxTokens: 4096,
+          streaming: true
+        },
+
+        // Local Model (keeps data on-premise)
+        localModelConfig: {
+          enabled: true,
+          modelType: 'ollama',
+          endpoint: 'http://localhost:11434',
+          capabilities: ['scan', 'classify']
+        },
+
+        // Vertex AI (for pattern analysis)
+        vertexConfig: {
+          enabled: true,
+          projectId: 'my-gcp-project',
+          location: 'us-central1',
+          modelId: 'gemini-1.5-pro',
+          useForPatternAnalysis: true,
+          useForAnomalyDetection: true
+        },
+
+        // Continuous Monitoring
+        monitoringConfig: {
+          enabled: true,
+          intervalSeconds: 60,
+          alertThresholds: [
+            {
+              metric: 'critical_findings',
+              operator: 'gt',
+              value: 0,
+              severity: 'critical',
+              cooldownSeconds: 300
+            }
+          ],
+          notificationChannels: [
+            {
+              type: 'slack',
+              config: { webhookUrl: 'https://hooks.slack.com/...' },
+              severityFilter: ['critical', 'high']
+            }
+          ]
+        },
+
+        // Data Sanitization
+        sanitizationConfig: {
+          enabled: true,
+          preserveFormat: true,
+          hashSensitiveValues: false
+        },
+
+        // Storage
+        storageConfig: {
+          type: 'database',
+          retentionDays: 90,
+          encryptAtRest: true
+        }
+      }
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+### Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `modelConfig` | `ModelConfig` | AI model settings for the agent |
+| `localModelConfig` | `LocalModelConfig` | Local model for on-premise processing |
+| `vertexConfig` | `VertexConfig` | Vertex AI settings for cloud analysis |
+| `monitoringConfig` | `MonitoringConfig` | Continuous monitoring settings |
+| `sanitizationConfig` | `SanitizationConfig` | Data sanitization rules |
+| `storageConfig` | `StorageConfig` | Audit data storage settings |
+
+## Available Commands
+
+The agent responds to natural language commands:
+
+| Command | Description |
+|---------|-------------|
+| `full audit` | Run complete security audit (all scanners) |
+| `config audit` | Scan for credentials, exposed ports, weak auth |
+| `network map` | Map network topology, identify exposure |
+| `container scan` | Check Docker security, privileged containers |
+| `auth review` | Review authentication and credential isolation |
+| `log analysis` | Detect unusual access patterns |
+| `start monitoring` | Enable continuous security monitoring |
+| `stop monitoring` | Disable continuous monitoring |
+| `validate change` | Validate a proposed configuration change |
+| `impact analysis service:[name]` | Analyze impact if service changes |
+| `status` | Get current agent status |
+| `help` | Show available commands |
+
+## Scanners
+
+### ConfigScanner
+
+Scans configuration files and running services for security issues.
+
+**Checks performed:**
+- Default credentials for common services (MySQL, PostgreSQL, Redis, etc.)
+- Exposed ports on all interfaces (0.0.0.0)
+- Weak authentication settings
+- Hardcoded secrets in config files
+- Insecure environment variables
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { ConfigScanner } from 'agent-squad';
+
+    const scanner = new ConfigScanner({
+      targets: ['/app', '/etc', process.cwd()],
+      excludePatterns: ['node_modules', '.git'],
+      checkDefaultCredentials: true,
+      checkExposedPorts: true,
+      checkWeakAuth: true,
+      maxDepth: 5
+    });
+
+    const result = await scanner.scan();
+    console.log(`Found ${result.findings.length} issues`);
+    ```
+  </TabItem>
+</Tabs>
+
+### NetworkMapper
+
+Maps network topology and identifies exposure.
+
+**Checks performed:**
+- Host discovery (Docker, Kubernetes, local)
+- Port scanning and service detection
+- Unnecessary external exposure
+- Unencrypted protocols on exposed ports
+- Missing network segmentation
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { NetworkMapper } from 'agent-squad';
+
+    const mapper = new NetworkMapper({
+      discoverHosts: true,
+      scanPorts: true,
+      portRange: { start: 1, end: 65535 },
+      detectServices: true,
+      mapTopology: true
+    });
+
+    const result = await mapper.scan();
+    const topology = mapper.getTopology();
+    console.log(`Discovered ${topology.nodes.length} nodes`);
+    ```
+  </TabItem>
+</Tabs>
+
+### ContainerScanner
+
+Audits Docker container security.
+
+**Checks performed:**
+- Privileged containers
+- Docker socket mounts
+- Sensitive volume mounts
+- Host network mode
+- Dangerous capabilities (CAP_SYS_ADMIN, etc.)
+- Secrets in environment variables
+- Running as root
+- Use of :latest tag
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { ContainerScanner } from 'agent-squad';
+
+    const scanner = new ContainerScanner({
+      checkPrivileged: true,
+      checkVolumes: true,
+      checkNetwork: true,
+      checkCapabilities: true,
+      checkSecrets: true,
+      checkImages: true
+    });
+
+    const result = await scanner.scan();
+    const containers = scanner.getContainers();
+    ```
+  </TabItem>
+</Tabs>
+
+### AuthScanner
+
+Reviews authentication and authorization setup.
+
+**Checks performed:**
+- Shared credentials across environments
+- Weak passwords
+- Missing MFA
+- Insecure file permissions
+- Stale credentials
+- Service account issues
+- SSH configuration
+- API key management
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { AuthScanner } from 'agent-squad';
+
+    const scanner = new AuthScanner({
+      targets: [process.cwd(), process.env.HOME],
+      checkSharedCredentials: true,
+      checkPasswordStrength: true,
+      checkMFA: true,
+      checkPermissions: true,
+      checkCredentialAge: true,
+      maxCredentialAgeDays: 90
+    });
+
+    const result = await scanner.scan();
+    ```
+  </TabItem>
+</Tabs>
+
+### LogAnalyzer
+
+Analyzes logs for security patterns and anomalies.
+
+**Patterns detected:**
+- Brute force attacks (SSH, generic auth failures)
+- Privilege escalation attempts
+- Data exfiltration indicators
+- Lateral movement
+- Unusual access patterns
+- Web attacks (SQL injection, XSS, path traversal)
+- IMSI/mobile tracking data
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { LogAnalyzer } from 'agent-squad';
+
+    const analyzer = new LogAnalyzer({
+      logSources: [
+        '/var/log/auth.log',
+        '/var/log/syslog',
+        '/var/log/nginx/access.log'
+      ],
+      timeRange: {
+        start: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        end: new Date()
+      },
+      enableAnomalyDetection: true,
+      baselineWindow: 7
+    });
+
+    const result = await analyzer.scan();
+    ```
+  </TabItem>
+</Tabs>
+
+## Hybrid AI Processing
+
+The agent uses a hybrid approach to balance privacy with capability:
+
+### Local Processing (Data Stays On-Premise)
+- Initial scan and data collection
+- Classification of findings
+- Risk scoring
+- All sensitive data processing
+
+### Cloud Processing (Sanitized Data Only)
+- Pattern detection across findings
+- Anomaly detection
+- Correlation analysis
+- Advanced threat intelligence
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { HybridAIProcessor } from 'agent-squad';
+
+    const processor = new HybridAIProcessor(
+      // Local model config
+      {
+        enabled: true,
+        modelType: 'ollama',
+        endpoint: 'http://localhost:11434',
+        capabilities: ['scan', 'classify']
+      },
+      // Vertex AI config
+      {
+        enabled: true,
+        projectId: 'my-project',
+        location: 'us-central1',
+        modelId: 'gemini-1.5-pro',
+        useForPatternAnalysis: true,
+        useForAnomalyDetection: true
+      }
+    );
+
+    await processor.initialize();
+    const analysis = await processor.processAuditResults(auditResults);
+    // analysis.insights, analysis.patterns, analysis.recommendations
+    ```
+  </TabItem>
+</Tabs>
+
+## Continuous Monitoring
+
+### Starting the Monitor
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { ContinuousMonitor } from 'agent-squad';
+
+    const monitor = new ContinuousMonitor({
+      enabled: true,
+      intervalSeconds: 60,
+      alertThresholds: [
+        {
+          metric: 'critical_findings',
+          operator: 'gt',
+          value: 0,
+          severity: 'critical',
+          cooldownSeconds: 300
+        }
+      ],
+      notificationChannels: []
+    });
+
+    // Event handlers
+    monitor.on('alert', (data) => {
+      console.log('Security Alert:', data);
+    });
+
+    monitor.on('change', (change) => {
+      console.log('Change detected:', change.changeType);
+    });
+
+    // Start monitoring
+    await monitor.start();
+    ```
+  </TabItem>
+</Tabs>
+
+### Change Validation
+
+Validate changes before deployment against security policies:
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    // Built-in validation checks:
+    // - no_privileged_containers
+    // - no_public_database_ports
+    // - no_hardcoded_secrets
+    // - strong_auth_required
+    // - no_sensitive_mounts
+    // - no_latest_tag
+
+    const result = await monitor.validateChange({
+      id: 'change-123',
+      timestamp: new Date(),
+      changeType: 'container',
+      resourceId: 'my-container',
+      resourceType: 'docker',
+      previousState: {},
+      newState: { privileged: false, image: 'myapp:v1.2.3' },
+      validated: false
+    });
+
+    if (!result.passed) {
+      console.log('Deployment blocked:', result.errors);
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+### Dependency Tracking
+
+Track service dependencies to understand blast radius:
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    // Build dependency map
+    const dependencyMap = await monitor.buildDependencyMap();
+
+    // Analyze impact before changes
+    const impact = await monitor.analyzeImpact('database-service');
+    console.log(impact.directDependents);
+    console.log(impact.indirectDependents);
+    console.log(impact.criticalPath);
+
+    // Get all affected services
+    const affected = monitor.getAffectedServices('api-gateway');
+    ```
+  </TabItem>
+</Tabs>
+
+## Data Sanitization
+
+The `DataSanitizer` ensures sensitive data never leaves your infrastructure:
+
+### Default Patterns Sanitized
+- Passwords and secrets
+- API keys and tokens
+- AWS/Azure/GCP credentials
+- Private keys
+- Email addresses (partially)
+- Phone numbers, SSN, credit cards
+- IMSI/IMEI numbers
+- Internal IP addresses (partially)
+- MAC addresses
+- Internal hostnames and file paths
+- Database connection strings
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { DataSanitizer } from 'agent-squad';
+
+    const sanitizer = new DataSanitizer({
+      enabled: true,
+      preserveFormat: true,
+      patterns: [
+        // Add custom patterns
+        {
+          name: 'customer_id',
+          pattern: /CUST-[A-Z0-9]{8}/g,
+          replacement: '[CUSTOMER_ID_REDACTED]',
+          category: 'pii'
+        }
+      ]
+    });
+
+    // Sanitize a string
+    const result = sanitizer.sanitizeString('password=secret123');
+    // result.sanitized = 'password=[REDACTED]'
+
+    // Sanitize an object
+    const sanitized = sanitizer.sanitizeObject(configData);
+    ```
+  </TabItem>
+</Tabs>
+
+## CLI Interface
+
+The agent includes a command-line interface:
+
+```bash
+# Show help
+npx security-audit --help
+
+# Run full audit
+npx security-audit full-audit
+
+# Run specific scans
+npx security-audit config-audit
+npx security-audit network-map
+npx security-audit container-scan
+
+# Output as JSON (for automation)
+npx security-audit full-audit -o json
+
+# Interactive mode
+npx security-audit -i
+
+# Start continuous monitoring
+npx security-audit monitor
+```
+
+## Integration with Agent Squad
+
+The SecurityAuditAgent can be added to an AgentSquad orchestrator:
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { AgentSquad, SecurityAuditAgent, BedrockLLMAgent } from 'agent-squad';
+
+    const orchestrator = new AgentSquad();
+
+    // Add general assistant
+    orchestrator.addAgent(new BedrockLLMAgent({
+      name: 'General Assistant',
+      description: 'Handles general inquiries'
+    }));
+
+    // Add security audit agent
+    orchestrator.addAgent(new SecurityAuditAgent({
+      name: 'Security Auditor',
+      description: 'Performs security audits and monitoring'
+    }));
+
+    // Route requests - classifier will route security-related
+    // questions to the SecurityAuditAgent
+    const response = await orchestrator.routeRequest(
+      'Run a security audit on my infrastructure',
+      'user123',
+      'session456'
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+## Complete Example
+
+<Tabs syncKey="runtime">
+  <TabItem label="TypeScript" icon="seti:typescript" color="blue">
+    ```typescript
+    import { SecurityAuditAgent, ContinuousMonitor } from 'agent-squad';
+
+    async function main() {
+      // Create agent with full configuration
+      const agent = new SecurityAuditAgent({
+        name: 'ProductionSecurityAgent',
+        config: {
+          localModelConfig: {
+            enabled: true,
+            modelType: 'ollama',
+            endpoint: 'http://localhost:11434'
+          },
+          vertexConfig: {
+            enabled: true,
+            projectId: process.env.GOOGLE_CLOUD_PROJECT,
+            useForPatternAnalysis: true
+          },
+          monitoringConfig: {
+            enabled: true,
+            intervalSeconds: 300,
+            alertThresholds: [
+              {
+                metric: 'critical_findings',
+                operator: 'gt',
+                value: 0,
+                severity: 'critical',
+                cooldownSeconds: 3600
+              }
+            ],
+            notificationChannels: [
+              {
+                type: 'slack',
+                config: { webhookUrl: process.env.SLACK_WEBHOOK },
+                severityFilter: ['critical', 'high']
+              }
+            ]
+          }
+        }
+      });
+
+      // Run full audit
+      console.log('Running security audit...\n');
+      const auditResponse = await agent.processRequest(
+        'full audit',
+        'admin',
+        'audit-session',
+        []
+      );
+      console.log(auditResponse.content[0].text);
+
+      // Start continuous monitoring
+      console.log('\nStarting continuous monitoring...');
+      await agent.processRequest(
+        'start monitoring',
+        'admin',
+        'monitor-session',
+        []
+      );
+
+      // Get status
+      const status = await agent.processRequest(
+        'status',
+        'admin',
+        'status-session',
+        []
+      );
+      console.log(status.content[0].text);
+    }
+
+    main().catch(console.error);
+    ```
+  </TabItem>
+</Tabs>
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID for Vertex AI |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to GCP credentials file |
+| `OLLAMA_HOST` | Ollama endpoint (default: http://localhost:11434) |
+| `SLACK_WEBHOOK_URL` | Slack webhook for alerts |
+
+## Requirements
+
+- Node.js 18+
+- Docker (optional, for container scanning)
+- Kubernetes CLI (optional, for K8s discovery)
+- Google Cloud SDK (optional, for Vertex AI)
+- Ollama (optional, for local AI processing)
+
+## Best Practices
+
+1. **Start with local processing** - Enable local model first to keep sensitive data on-premise
+2. **Use deterministic settings** - Set temperature to 0 for consistent security assessments
+3. **Enable continuous monitoring** - Catch security issues as they're introduced
+4. **Integrate with CI/CD** - Validate changes before deployment
+5. **Configure alerts** - Set up notification channels for critical findings
+6. **Regular full audits** - Run comprehensive scans on a schedule
+7. **Review dependency maps** - Understand your service topology before making changes
