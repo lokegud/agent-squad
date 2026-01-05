@@ -68,10 +68,9 @@ class BedrockLLMAgent(Agent):
             self.inference_config = default_inference_config
 
         self.additional_model_request_fields: Optional[dict[str, Any]] = options.additional_model_request_fields or {}
-        # if thinking is enabled, unset top_p
-        if self.additional_model_request_fields.get("thinking", {}).get("type") == "enabled":
-            Logger.warn("Removing topP for thinking mode")
-            del self.inference_config["topP"]
+
+        # Validate and adjust configuration for thinking mode
+        self._validate_thinking_config()
 
         self.guardrail_config: Optional[dict[str, str]] = options.guardrail_config or {}
 
@@ -108,6 +107,28 @@ class BedrockLLMAgent(Agent):
                 options.custom_system_prompt.get("template"),
                 options.custom_system_prompt.get("variables"),
             )
+
+    def _validate_thinking_config(self) -> None:
+        """Validate and adjust configuration when thinking mode is enabled.
+
+        Thinking mode requires specific inference configuration:
+        - temperature must be set to 1
+        - topP must be unset (removed from inference config)
+        """
+        thinking_config = self.additional_model_request_fields.get("thinking", {})
+        if thinking_config.get("type") == "enabled":
+            temperature = self.inference_config.get("temperature")
+
+            if temperature != 1:
+                Logger.warn(
+                    f"Thinking mode is enabled but temperature is {temperature}. "
+                    "For optimal results, temperature should be set to 1."
+                )
+
+            # Bedrock requires topP to be unset when thinking is enabled
+            if "topP" in self.inference_config:
+                Logger.warn("Removing topP from inference config for thinking mode (required by Bedrock).")
+                del self.inference_config["topP"]
 
     def is_streaming_enabled(self) -> bool:
         return self.streaming is True

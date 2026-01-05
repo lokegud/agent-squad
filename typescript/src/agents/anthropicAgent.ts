@@ -124,6 +124,9 @@ export class AnthropicAgent extends Agent {
       stopSequences: options.inferenceConfig?.stopSequences ?? [],
     };
 
+    // Validate thinking mode configuration
+    this.validateThinkingConfig();
+
     this.retriever = options.retriever;
 
     this.toolConfig = options.toolConfig;
@@ -151,6 +154,32 @@ export class AnthropicAgent extends Agent {
         options.customSystemPrompt.template,
         options.customSystemPrompt.variables
       );
+    }
+  }
+
+  /**
+   * Validates configuration when thinking mode is enabled.
+   * Thinking mode requires specific inference configuration:
+   * - temperature must be set to 1
+   * - topP should be >= 0.95 (recommended)
+   */
+  private validateThinkingConfig(): void {
+    if (this.thinking?.type === "enabled") {
+      const { temperature, topP } = this.inferenceConfig;
+
+      if (temperature !== 1) {
+        Logger.logger.warn(
+          `Thinking mode is enabled but temperature is ${temperature}. ` +
+            "For optimal results, temperature should be set to 1."
+        );
+      }
+
+      if (topP !== undefined && topP < 0.95) {
+        Logger.logger.warn(
+          `Thinking mode is enabled but topP is ${topP}. ` +
+            "For optimal results, topP should be >= 0.95."
+        );
+      }
     }
   }
 

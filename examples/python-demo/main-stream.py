@@ -14,7 +14,12 @@ from agent_squad.agents import (BedrockLLMAgent,
                         AgentResponse,
                         AgentStreamResponse,
                         AgentCallbacks)
-from agent_squad.types import ConversationMessage, ParticipantRole
+from agent_squad.types import (
+    ConversationMessage,
+    ParticipantRole,
+    BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
+    ANTHROPIC_MODEL_ID_CLAUDE_3_7_SONNET,
+)
 from agent_squad.utils import AgentToolCallbacks
 from dotenv import load_dotenv
 
@@ -184,7 +189,7 @@ if __name__ == "__main__":
             "temperature":1.0
         },
         description="Specializes in health and well being.",
-        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        model_id=BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
         additional_model_request_fields={
             "thinking": {
                 "type": "enabled",
@@ -199,7 +204,7 @@ if __name__ == "__main__":
     #     api_key=os.getenv('ANTHROPIC_API_KEY', None),
     #     name="Weather Agent",
     #     streaming=True,
-    #     model_id="claude-3-7-sonnet-20250219",
+    #     model_id=ANTHROPIC_MODEL_ID_CLAUDE_3_7_SONNET,
     #     description="Specialized agent for giving weather condition from a city.",
     #     tool_config={
     #         'tool': [tool.to_claude_format() for tool in weather_tool.weather_tools.tools],
@@ -250,7 +255,7 @@ if __name__ == "__main__":
     weather_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
         name="Weather Agent",
         streaming=True,
-        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        model_id=BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
         description="Specialized agent for giving weather condition from a city.",
         tool_config={
             'tool': [tool.to_bedrock_format() for tool in weather_tool.weather_tools.tools],

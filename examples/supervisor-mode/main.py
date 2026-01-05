@@ -17,7 +17,12 @@ from agent_squad.agents import (
     AgentCallbacks,
 )
 from agent_squad.classifiers import ClassifierResult
-from agent_squad.types import ConversationMessage
+from agent_squad.types import (
+    ConversationMessage,
+    BEDROCK_MODEL_ID_CLAUDE_3_HAIKU,
+    BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
+    ANTHROPIC_MODEL_ID_CLAUDE_3_7_SONNET,
+)
 from agent_squad.storage import DynamoDbChatStorage
 from agent_squad.utils import AgentTools, AgentTool, AgentToolCallbacks
 
@@ -77,14 +82,14 @@ tech_agent = BedrockLLMAgent(
     options=BedrockLLMAgentOptions(
         name="TechAgent",
         description="You are a tech agent. You are responsible for answering questions about tech. You are only allowed to answer questions about tech. You are not allowed to answer questions about anything else.",
-        model_id="anthropic.claude-3-haiku-20240307-v1:0",
+        model_id=BEDROCK_MODEL_ID_CLAUDE_3_HAIKU,
     )
 )
 
 sales_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
     name="SalesAgent",
     description="You are a sales agent. You are responsible for answering questions about sales. You are only allowed to answer questions about sales. You are not allowed to answer questions about anything else.",
-    model_id="anthropic.claude-3-haiku-20240307-v1:0",
+    model_id=BEDROCK_MODEL_ID_CLAUDE_3_HAIKU,
 ))
 
 claim_agent = AmazonBedrockAgent(AmazonBedrockAgentOptions(
@@ -97,7 +102,7 @@ claim_agent = AmazonBedrockAgent(AmazonBedrockAgentOptions(
 weather_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
         name="WeatherAgent",
         streaming=True,
-        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        model_id=BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
         description="Specialized agent for giving weather forecast condition from a city.",
         tool_config={
             'tool':weather_tool_description,
@@ -123,13 +128,13 @@ weather_agent.set_system_prompt(weather_tool_prompt)
 health_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
     name="HealthAgent",
     description="You are a health agent. You are responsible for answering questions about health. You are only allowed to answer questions about health. You are not allowed to answer questions about anything else.",
-    model_id="anthropic.claude-3-haiku-20240307-v1:0",
+    model_id=BEDROCK_MODEL_ID_CLAUDE_3_HAIKU,
 ))
 
 travel_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
     name="TravelAgent",
     description="You are a travel assistant agent. You are responsible for answering questions about travel, activities, sight seesing about a city and surrounding",
-    model_id="anthropic.claude-3-haiku-20240307-v1:0",
+    model_id=BEDROCK_MODEL_ID_CLAUDE_3_HAIKU,
 ))
 
 airlines_agent = LexBotAgent(LexBotAgentOptions(name='AirlinesBot',
@@ -142,7 +147,7 @@ if _ANTHROPIC_AVAILABLE:
     lead_agent = AnthropicAgent(AnthropicAgentOptions(
         api_key=os.getenv('ANTHROPIC_API_KEY', None),
         name="SupervisorAgent",
-        model_id="claude-3-7-sonnet-20250219",
+        model_id=ANTHROPIC_MODEL_ID_CLAUDE_3_7_SONNET,
         description="You are a supervisor agent. You are responsible for managing the flow of the conversation. You are only allowed to manage the flow of the conversation. You are not allowed to answer questions about anything else.",
         streaming=True,
         inference_config={
@@ -161,7 +166,7 @@ if _ANTHROPIC_AVAILABLE:
 else:
     lead_agent = BedrockLLMAgent(BedrockLLMAgentOptions(
         name="SupervisorAgent",
-        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        model_id=BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
         streaming=True,
         inference_config={
             "temperature":1.0,

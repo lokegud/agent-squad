@@ -8,4 +8,7 @@ pytest-asyncio
 openai
 libsql-client
 ruff>=0.11.4
+# Pinned due to breaking import path changes in strands-agents.
+# The import changed from strands.types.models.Model to strands.models.model.Model.
+# Review before upgrading: https://github.com/strands-agents/strands-agents/releases
 strands-agents==1.5.0

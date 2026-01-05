@@ -1,9 +1,11 @@
 export const BEDROCK_MODEL_ID_CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0";
 export const BEDROCK_MODEL_ID_CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0";
 export const BEDROCK_MODEL_ID_CLAUDE_3_5_SONNET = "anthropic.claude-3-5-sonnet-20240620-v1:0";
+export const BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET = "us.anthropic.claude-3-7-sonnet-20250219-v1:0";
 export const BEDROCK_MODEL_ID_LLAMA_3_70B = "meta.llama3-70b-instruct-v1:0";
 export const OPENAI_MODEL_ID_GPT_O_MINI = "gpt-4o-mini";
 export const ANTHROPIC_MODEL_ID_CLAUDE_3_5_SONNET = "claude-3-5-sonnet-20240620";
+export const ANTHROPIC_MODEL_ID_CLAUDE_3_7_SONNET = "claude-3-7-sonnet-20250219";
 
 export const AgentTypes = {
   DEFAULT: "Common Knowledge",

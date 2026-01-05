@@ -131,6 +131,9 @@ export class BedrockLLMAgent extends Agent {
 
     this.reasoningConfig = options.reasoningConfig ?? null;
 
+    // Validate thinking mode configuration
+    this.validateThinkingConfig();
+
     this.retriever = options.retriever ?? null;
 
     this.toolConfig = options.toolConfig ?? null;
@@ -158,6 +161,33 @@ export class BedrockLLMAgent extends Agent {
         options.customSystemPrompt.template,
         options.customSystemPrompt.variables
       );
+    }
+  }
+
+  /**
+   * Validates and adjusts configuration when thinking mode is enabled.
+   * Thinking mode requires specific inference configuration:
+   * - temperature must be set to 1
+   * - topP must be unset (removed from inference config)
+   */
+  private validateThinkingConfig(): void {
+    if (this.reasoningConfig?.thinking?.type === "enabled") {
+      const temperature = this.inferenceConfig?.temperature;
+
+      if (temperature !== undefined && temperature !== 1) {
+        Logger.logger.warn(
+          `Thinking mode is enabled but temperature is ${temperature}. ` +
+            "For optimal results, temperature should be set to 1."
+        );
+      }
+
+      // Bedrock requires topP to be unset when thinking is enabled
+      if (this.inferenceConfig?.topP !== undefined) {
+        Logger.logger.warn(
+          "Removing topP from inference config for thinking mode (required by Bedrock)."
+        );
+        delete this.inferenceConfig.topP;
+      }
     }
   }
 

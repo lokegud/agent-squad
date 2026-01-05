@@ -75,6 +75,9 @@ class AnthropicAgent(Agent):
         # Initialize additional_model_request_fields
         self.additional_model_request_fields: Optional[dict[str, Any]] = options.additional_model_request_fields or {}
 
+        # Validate thinking mode configuration
+        self._validate_thinking_config()
+
         self.retriever = options.retriever
         self.tool_config: Optional[dict[str, Any]] = options.tool_config
 
@@ -104,6 +107,30 @@ class AnthropicAgent(Agent):
             self.set_system_prompt(
                 options.custom_system_prompt.get("template"), options.custom_system_prompt.get("variables")
             )
+
+    def _validate_thinking_config(self) -> None:
+        """Validate configuration when thinking mode is enabled.
+
+        Thinking mode requires specific inference configuration:
+        - temperature must be set to 1
+        - topP should be >= 0.95 (recommended)
+        """
+        thinking_config = self.additional_model_request_fields.get("thinking", {})
+        if thinking_config.get("type") == "enabled":
+            temperature = self.inference_config.get("temperature")
+            top_p = self.inference_config.get("topP")
+
+            if temperature != 1:
+                Logger.warn(
+                    f"Thinking mode is enabled but temperature is {temperature}. "
+                    "For optimal results, temperature should be set to 1."
+                )
+
+            if top_p is not None and top_p < 0.95:
+                Logger.warn(
+                    f"Thinking mode is enabled but topP is {top_p}. "
+                    "For optimal results, topP should be >= 0.95."
+                )
 
     def is_streaming_enabled(self) -> bool:
         return self.streaming is True

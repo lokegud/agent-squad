@@ -6,6 +6,7 @@ import {
   LexBotAgent,
   LambdaAgent,
   Logger,
+  BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
 } from "agent-squad";
 
 import {weatherToolDescription, weatherToolHanlder, WEATHER_PROMPT } from './tools/weather_tool'
@@ -48,10 +49,10 @@ function createOrchestrator(): AgentSquad {
     })
   );
 
-  // Add weahter agent with tool
+  // Add weather agent with tool
   const weatherAgent = new BedrockLLMAgent({
     name: "Weather Agent",
-    modelId:"us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    modelId: BEDROCK_MODEL_ID_CLAUDE_3_7_SONNET,
     description:
       "Specialized agent for giving weather condition from a city.",
     streaming: false,
